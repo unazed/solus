@@ -1,6 +1,10 @@
 #!/usr/bin/env python
-from __future__ import print_function, unicode_literals, division
-from argparse import ArgumentParser, ArgumentError
+from __future__ import print_function
+from __future__ import unicode_literals
+from __future__ import division
+from argparse import ArgumentParser
+from argparse import ArgumentError
+from types import NoneType
 
 import binascii
 import cv2
@@ -10,43 +14,37 @@ import numpy as np
 import struct
 import sys
 
-__author__ = "GoodiesHQ"
 
-CHAN_SIZE   = 8     # Number of bits per channel.
-PROLOG_SIZE = 2     # Number of pixels used for the prologue.
-LEN_SIZE    = 4     # number of bytes that store the length of data
-CHAN_CNT    = 3     # Number of channels (R,G,B)
-PNG_COMP    = 4     # Default PNG compression value
+__author__ = "faggot"
 
-# Exceptions
+CHAN_SIZE   = 8  # Number of bits per channel.
+PROLOG_SIZE = 2  # Number of pixels used for the prologue.
+LEN_SIZE    = 4  # number of bytes that store the length of data
+CHAN_CNT    = 3  # Number of channels (R,G,B)
+PNG_COMP    = 4  # Default PNG compression value
 
-class UnexpectedXOR(Exception):
-    """An XOR key was provided, but none was expected"""
+
+class UnexpectedXOR(Exception): 
     pass
 
 
-class InvalidImage(Exception):
-    """The image provided is either not a valid image (encoding) or was not encoded using this utility (decoding)."""
+class InvalidImage(Exception): 
     pass
 
 
-class TooMuchData(Exception):
-    """The image is not able to store all of the data."""
+class TooMuchData(Exception): 
     pass
 
 
-class InvalidLSB(Exception):
-    """The provided LSB value is invalid"""
+class InvalidLSB(Exception): 
     pass
 
 
-class InvalidXOR(Exception):
-    """The XOR key provided is invalid"""
+class InvalidXOR(Exception): 
     pass
 
 
-class MissingXOR(Exception):
-    """An XOR key was expected, but none was provided"""
+class MissingXOR(Exception): 
     pass
 
 
@@ -133,6 +131,7 @@ class LSBCodec(object):
     def img(self):
         return self._img
 
+    
 class LSBDecoder(LSBCodec):
     def __init__(self, img):
         super(LSBDecoder, self).__init__(img)
@@ -154,28 +153,34 @@ class LSBDecoder(LSBCodec):
         return value
 
     def decode(self, xor_key=None):
-        if not isinstance(xor_key, (bytes, type(None))):
+        if not isinstance(xor_key, (bytes, NoneType)):
             raise TypeError("Only bytes can be used as xor keys.")
+            
         piter = self.iter_pixels()
         m0, m1 = self.gen0mask(CHAN_CNT), self.gen1mask(CHAN_CNT)
         prolog = self._decode_data(PROLOG_SIZE * CHAN_CNT, 1, piter)
         xor, lsb_cnt = prolog & m0, prolog & m1
+        
         try:
             if xor not in (self.XOR_Y, self.XOR_N):
                 raise InvalidXOR
             lsb_cnt = lsb_check(lsb_cnt)
-        except (InvalidXOR, InvalidLSB):
+        except InvalidXOR, InvalidLSB:
             raise ValueError("The image provided is invalid.")
+            
         if xor == self.XOR_Y and xor_key is None:
             raise MissingXOR
+        
         size = self._decode_data(LEN_SIZE * CHAN_SIZE // lsb_cnt, lsb_cnt, piter)
         print("Decoding {} bytes.".format(size))
         data = self._decode_data(size * CHAN_SIZE // lsb_cnt, lsb_cnt, piter)
         data = self.int_to_bytes(data, size)
         if xor == self.XOR_Y:
             data = self.xor(data, xor_key)
+            
         return data
 
+    
 class LSBEncoder(LSBCodec):
     """
     Contains the image, offsets, and mask values.
@@ -200,12 +205,14 @@ class LSBEncoder(LSBCodec):
     def encode(self, data, lsb_cnt=1, xor_key=None):
         if not isinstance(data, bytes):
             raise TypeError("Only bytes can be encoded.")
-        if not isinstance(xor_key, (bytes, type(None))):
+        elif not isinstance(xor_key, (bytes, type(None))):
             raise TypeError("Only bytes can be used as xor keys.")
 
         assert lsb_check(lsb_cnt)
+        
         piter = self.iter_pixels()
         size = len(data)
+        
         print("Encoding {} bytes.".format(size))
 
         if size > self.available(lsb_cnt):
@@ -213,6 +220,7 @@ class LSBEncoder(LSBCodec):
 
         if xor_key is not None:
             data = self.xor(data, xor_key)
+            
         data = self.bytes_to_int(data)
 
         prolog = (self.XOR_N if xor_key is None else self.XOR_Y) | lsb_cnt
@@ -229,6 +237,7 @@ class LSBEncoder(LSBCodec):
             data = f.read()
         return self.encode(data, xor_key)
 
+    
 def lsb_check(bits):
     bits = int(bits)
     # if not bits or CHAN_SIZE % bits or bits >= CHAN_SIZE:
